@@ -275,7 +275,7 @@ else:
                     # 确保图片是RGB格式
                     if image.mode != 'RGB':
                         image = image.convert('RGB')
-                    st.image(image, caption=f"文件名: {uploaded_file.name}", use_container_width=True)
+                    st.image(image, caption=f"文件名: {uploaded_file.name}")
                 
                 with col2:
                     st.subheader("🎯 检测结果")
@@ -287,7 +287,7 @@ else:
                     # 在图片上绘制检测结果
                     for result in results:
                         plotted = result.plot()
-                        st.image(plotted, caption="检测结果", use_container_width=True)
+                        st.image(plotted, caption="检测结果")
                         
                         # 更新统计信息
                         st.session_state.processed_images += 1
@@ -365,11 +365,11 @@ else:
                         # 显示原图和检测结果的对比
                         col1, col2 = st.columns(2)
                         with col1:
-                            st.image(image, caption="原图", use_container_width=True)
+                            st.image(image, caption="原图")
                         with col2:
                             for result in results:
                                 plotted = result.plot()
-                                st.image(plotted, caption="检测结果", use_container_width=True)
+                                st.image(plotted, caption="检测结果")
                                 
                                 # 更新统计信息
                                 boxes = result.boxes
@@ -641,7 +641,7 @@ else:
                     """)
                 
                 # 显示帧
-                frame_placeholder.image(frame, channels="BGR", caption="实时检测", use_container_width=True)
+                frame_placeholder.image(frame, channels="BGR", caption="实时检测")
                 
                 # 控制帧率
                 time.sleep(0.01)
@@ -705,7 +705,7 @@ else:
                             })
                     
                     # 显示处理后的帧
-                    frame_placeholder.image(frame, channels="BGR", caption=f"Frame {frame_count}", use_container_width=True)
+                    frame_placeholder.image(frame, channels="BGR", caption=f"Frame {frame_count}")
                     
                     # 显示实时统计
                     if detection_results:

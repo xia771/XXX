@@ -229,7 +229,7 @@ else:
             fig = px.line(df, x=df.index, y='num_detections', 
                          title='检测历史趋势',
                          labels={'index': '检测序号', 'num_detections': '检测数量'})
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig)
         
         st.markdown("---")
         st.markdown("""
@@ -320,7 +320,7 @@ else:
                                              title='置信度分布',
                                              labels={'value': '置信度', 'count': '数量'},
                                              nbins=10)
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig)
                         else:
                             st.warning("⚠️ 未检测到目标")
                         
@@ -552,7 +552,7 @@ else:
                     fig1 = px.histogram(df, x='detections',
                                       title='每张图片检测目标数量分布',
                                       labels={'detections': '检测目标数', 'count': '图片数量'})
-                    st.plotly_chart(fig1, use_container_width=True)
+                    st.plotly_chart(fig1)
                     
                     # 显示置信度分布
                     all_confidences = [conf for result in detection_results 
@@ -562,7 +562,7 @@ else:
                                           title='检测置信度分布',
                                           labels={'value': '置信度', 'count': '目标数量'},
                                           nbins=50)
-                        st.plotly_chart(fig2, use_container_width=True)
+                        st.plotly_chart(fig2)
                     
                     # 保存统计结果
                     if save_results and save_path:
@@ -730,7 +730,7 @@ else:
                     fig = px.line(df, x='frame', y='detections',
                                 title='检测目标数量随时间变化',
                                 labels={'frame': '帧数', 'detections': '检测目标数'})
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig)
     
     # 统计分析部分
     st.markdown("---")

@@ -262,65 +262,71 @@ else:
         uploaded_file = st.file_uploader("选择图片", type=['png', 'jpg', 'jpeg'])
     
         if uploaded_file is not None:
-            # 读取图片
-            image = Image.open(uploaded_file)
-            img_array = np.array(image)
-            
-            # 创建两列布局
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.subheader("📸 原始图片")
-                st.image(image, caption=f"文件名: {uploaded_file.name}", use_container_width=True)
-            
-            with col2:
-                st.subheader("🎯 检测结果")
-                start_time = time.time()
-                # 进行预测
-                results = model(img_array, conf=confidence, iou=iou_threshold, max_det=max_det)
-                end_time = time.time()
+            try:
+                # 读取图片
+                image = Image.open(uploaded_file)
+                img_array = np.array(image)
                 
-                # 在图片上绘制检测结果
-                for result in results:
-                    plotted = result.plot()
-                    st.image(plotted, caption="检测结果", use_container_width=True)
+                # 创建两列布局
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("📸 原始图片")
+                    # 确保图片是RGB格式
+                    if image.mode != 'RGB':
+                        image = image.convert('RGB')
+                    st.image(image, caption=f"文件名: {uploaded_file.name}", use_container_width=True)
+                
+                with col2:
+                    st.subheader("🎯 检测结果")
+                    start_time = time.time()
+                    # 进行预测
+                    results = model(img_array, conf=confidence, iou=iou_threshold, max_det=max_det)
+                    end_time = time.time()
                     
-                    # 更新统计信息
-                    st.session_state.processed_images += 1
-                    boxes = result.boxes
-                    num_detections = len(boxes)
-                    st.session_state.total_detections += num_detections
-                    
-                    # 保存检测记录
-                    confidence_scores = [box.conf.item() for box in boxes]
-                    save_detection_record(uploaded_file.name, num_detections, confidence_scores)
-                    
-                    # 显示检测结果
-                    if num_detections > 0:
-                        st.success(f"✅ 检测到 {num_detections} 个目标")
+                    # 在图片上绘制检测结果
+                    for result in results:
+                        plotted = result.plot()
+                        st.image(plotted, caption="检测结果", use_container_width=True)
                         
-                        # 创建检测结果表格
-                        results_data = []
-                        for i, box in enumerate(boxes):
-                            confidence = box.conf.item()
-                            results_data.append({
-                                "目标编号": i + 1,
-                                "置信度": f"{confidence:.2%}",
-                                "坐标": f"({int(box.xyxy[0][0])}, {int(box.xyxy[0][1])}, {int(box.xyxy[0][2])}, {int(box.xyxy[0][3])})"
-                            })
+                        # 更新统计信息
+                        st.session_state.processed_images += 1
+                        boxes = result.boxes
+                        num_detections = len(boxes)
+                        st.session_state.total_detections += num_detections
                         
-                        st.table(results_data)
+                        # 保存检测记录
+                        confidence_scores = [box.conf.item() for box in boxes]
+                        save_detection_record(uploaded_file.name, num_detections, confidence_scores)
                         
-                        # 显示置信度分布
-                        fig = px.histogram(confidence_scores, 
-                                         title='置信度分布',
-                                         labels={'value': '置信度', 'count': '数量'},
-                                         nbins=10)
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        st.warning("⚠️ 未检测到目标")
-                    
-                    st.info(f"⚡ 检测用时: {(end_time - start_time):.3f} 秒")
+                        # 显示检测结果
+                        if num_detections > 0:
+                            st.success(f"✅ 检测到 {num_detections} 个目标")
+                            
+                            # 创建检测结果表格
+                            results_data = []
+                            for i, box in enumerate(boxes):
+                                confidence = box.conf.item()
+                                results_data.append({
+                                    "目标编号": i + 1,
+                                    "置信度": f"{confidence:.2%}",
+                                    "坐标": f"({int(box.xyxy[0][0])}, {int(box.xyxy[0][1])}, {int(box.xyxy[0][2])}, {int(box.xyxy[0][3])})"
+                                })
+                            
+                            st.table(results_data)
+                            
+                            # 显示置信度分布
+                            fig = px.histogram(confidence_scores, 
+                                             title='置信度分布',
+                                             labels={'value': '置信度', 'count': '数量'},
+                                             nbins=10)
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.warning("⚠️ 未检测到目标")
+                        
+                        st.info(f"⚡ 检测用时: {(end_time - start_time):.3f} 秒")
+            except Exception as e:
+                st.error(f"处理图片时出错: {str(e)}")
     
     elif detection_mode == "📁 批量图片检测":
         uploaded_files = st.file_uploader("选择多张图片", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)

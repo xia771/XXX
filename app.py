@@ -7,9 +7,6 @@ from ultralytics import YOLO
 import time
 import os
 from datetime import datetime
-import json
-import plotly.graph_objects as go
-import plotly.express as px
 import pandas as pd
 
 # 设置页面配置
@@ -20,28 +17,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 初始化session state
-if 'detection_history' not in st.session_state:
-    st.session_state.detection_history = []
-if 'total_detections' not in st.session_state:
-    st.session_state.total_detections = 0
-if 'processed_images' not in st.session_state:
-    st.session_state.processed_images = 0
-if 'detection_times' not in st.session_state:
-    st.session_state.detection_times = []
-if 'model_path' not in st.session_state:
-    st.session_state.model_path = 'best.pt'
-
 # 自定义CSS样式
 st.markdown("""
     <style>
-        .stApp {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .main {
-            padding: 2rem;
-        }
         .stButton>button {
             width: 100%;
             background-color: #ff4b4b;
@@ -50,53 +28,25 @@ st.markdown("""
         .stButton>button:hover {
             background-color: #ff6b6b;
         }
-        .reportview-container {
-            margin-top: 2rem;
-        }
-        .css-1d391kg {
-            padding: 1rem;
-            border-radius: 0.5rem;
-            background-color: #f0f2f6;
-        }
-        .stMetricValue {
-            font-size: 2rem !important;
-        }
-        h1 {
-            color: #ff4b4b;
-        }
-        h2 {
-            color: #666;
-        }
     </style>
 """, unsafe_allow_html=True)
-
-# 保存检测记录
-def save_detection_record(image_name, num_detections, confidence_scores):
-    """保存检测记录到JSON文件"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # 添加新记录
-    st.session_state.detection_history.append({
-        "timestamp": timestamp,
-        "image_name": image_name,
-        "num_detections": num_detections,
-        "confidence_scores": confidence_scores
-    })
-    
-    # 保存到JSON文件
-    with open('detection_history.json', 'w') as f:
-        json.dump(st.session_state.detection_history, f)
 
 # 加载模型
 @st.cache_resource
 def load_model(model_path):
     return YOLO(model_path)
 
-model = load_model(st.session_state.model_path)
+# 模型选择
+available_models = [f for f in os.listdir('.') if f.endswith('.pt')]
+model_path = 'best.pt' if 'best.pt' in available_models else available_models[0] if available_models else None
+
+if not model_path:
+    st.error("未找到可用的模型文件！")
+    st.stop()
 
 # 主界面
 st.title("🪖 安全头盔检测系统")
-st.markdown(f"当前使用模型: `{st.session_state.model_path}`")
+st.markdown(f"当前使用模型: `{model_path}`")
 
 # 侧边栏配置
 with st.sidebar:
@@ -114,8 +64,7 @@ with st.sidebar:
     st.markdown("---")
     
     # 模型选择
-    available_models = [f for f in os.listdir('.') if f.endswith('.pt')]
-    st.session_state.model_path = st.selectbox(
+    model_path = st.selectbox(
         "选择检测模型",
         available_models,
         index=available_models.index('best.pt') if 'best.pt' in available_models else 0
@@ -129,23 +78,15 @@ with st.sidebar:
         max_det = st.number_input("最大检测数量", 1, 100, 20)
     
     st.markdown("---")
-    st.subheader("📊 实时统计")
-    
-    # 实时统计数据
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("总检测数", st.session_state.total_detections)
-    with col2:
-        st.metric("处理图片", st.session_state.processed_images)
-    
-    st.markdown("---")
     st.markdown("""
     ### 💡 使用说明
     1. 选择合适的检测模型
     2. 调整置信度阈值（值越小检出率越高）
     3. 选择检测模式（图片/视频）
-    4. 查看实时统计
     """)
+
+# 加载选择的模型
+model = load_model(model_path)
 
 if detection_mode == "📸 单张图片检测":
     uploaded_file = st.file_uploader("选择图片", type=['png', 'jpg', 'jpeg'])
@@ -178,23 +119,13 @@ if detection_mode == "📸 单张图片检测":
                     plotted = result.plot()
                     st.image(plotted, caption="检测结果")
                     
-                    # 更新统计信息
-                    st.session_state.processed_images += 1
-                    boxes = result.boxes
-                    num_detections = len(boxes)
-                    st.session_state.total_detections += num_detections
-                    
-                    # 保存检测记录
-                    confidence_scores = [box.conf.item() for box in boxes]
-                    save_detection_record(uploaded_file.name, num_detections, confidence_scores)
-                    
                     # 显示检测结果
-                    if num_detections > 0:
-                        st.success(f"✅ 检测到 {num_detections} 个目标")
+                    if len(result.boxes) > 0:
+                        st.success(f"✅ 检测到 {len(result.boxes)} 个目标")
                         
                         # 创建检测结果表格
                         results_data = []
-                        for i, box in enumerate(boxes):
+                        for i, box in enumerate(result.boxes):
                             confidence = box.conf.item()
                             results_data.append({
                                 "目标编号": i + 1,
@@ -253,21 +184,11 @@ elif detection_mode == "📁 批量图片检测":
                             plotted = result.plot()
                             st.image(plotted, caption="检测结果")
                             
-                            # 更新统计信息
-                            boxes = result.boxes
-                            num_detections = len(boxes)
-                            st.session_state.total_detections += num_detections
-                            st.session_state.processed_images += 1
-                            
-                            # 保存检测记录
-                            confidence_scores = [box.conf.item() for box in boxes]
-                            save_detection_record(uploaded_file.name, num_detections, confidence_scores)
-                            
                             # 显示检测结果
-                            if num_detections > 0:
-                                st.success(f"检测到 {num_detections} 个目标")
+                            if len(result.boxes) > 0:
+                                st.success(f"检测到 {len(result.boxes)} 个目标")
                                 # 显示置信度
-                                for i, conf in enumerate(confidence_scores):
+                                for i, conf in enumerate([box.conf.item() for box in result.boxes]):
                                     st.text(f"目标 {i+1} 置信度: {conf:.2%}")
                             else:
                                 st.warning("未检测到目标")
@@ -278,18 +199,6 @@ elif detection_mode == "📁 批量图片检测":
         progress_bar.empty()
         status_text.success("✅ 所有图片处理完成！")
         
-        # 显示批量处理统计
-        st.markdown("---")
-        st.subheader("📊 批量处理统计")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("处理图片总数", len(uploaded_files))
-        with col2:
-            st.metric("检测目标总数", st.session_state.total_detections)
-        with col3:
-            avg_time = sum(st.session_state.detection_times) / len(st.session_state.detection_times) if st.session_state.detection_times else 0
-            st.metric("平均处理时间", f"{avg_time:.3f}秒")
-    
 elif detection_mode == "📂 数据集文件夹检测":
     st.markdown("### 📂 数据集文件夹检测")
     
@@ -407,7 +316,6 @@ elif detection_mode == "📂 数据集文件夹检测":
                     - 已处理图片: {processed_count}/{len(image_files)}
                     - 检测到的目标: {detection_count}
                     - 平均每图目标数: {detection_count/max(1, processed_count):.2f}
-                    - 批处理用时: {batch_time:.3f}秒
                     - 每张图片平均用时: {batch_time/len(batch_files):.3f}秒
                     """)
                 
@@ -415,57 +323,26 @@ elif detection_mode == "📂 数据集文件夹检测":
                 progress_bar.empty()
                 status_text.success("✅ 数据集处理完成！")
                 
-                # 创建详细的统计报告
-                st.markdown("### 📊 处理结果统计")
-                
-                # 基础统计
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("处理图片总数", processed_count)
-                with col2:
-                    st.metric("检测目标总数", detection_count)
-                with col3:
-                    st.metric("平均每图目标数", f"{detection_count/max(1, processed_count):.2f}")
-                
                 # 创建检测结果DataFrame
                 df = pd.DataFrame(detection_results)
+
+                # 显示统计信息
+                st.markdown("### 📊 检测统计分析")
                 
-                # 显示检测分布图表
-                fig1 = px.histogram(df, x='detections',
-                                  title='每张图片检测目标数量分布',
-                                  labels={'detections': '检测目标数', 'count': '图片数量'})
-                st.plotly_chart(fig1)
-                
-                # 显示置信度分布
-                all_confidences = [conf for result in detection_results 
-                                 for conf in result['confidences']]
-                if all_confidences:
-                    fig2 = px.histogram(all_confidences,
-                                      title='检测置信度分布',
-                                      labels={'value': '置信度', 'count': '目标数量'},
-                                      nbins=50)
-                    st.plotly_chart(fig2)
-                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("总处理图片数", processed_count)
+                with col2:
+                    st.metric("总检测目标数", detection_count)
+                with col3:
+                    avg_detections = detection_count/max(1, processed_count)
+                    st.metric("平均每张检测数", f"{avg_detections:.2f}")
+                    
                 # 保存统计结果
                 if save_results and save_path:
                     # 保存统计报告
                     report_path = os.path.join(save_path, 'detection_report.csv')
                     df.to_csv(report_path, index=False)
-                    
-                    # 保存详细结果
-                    detailed_results = {
-                        'summary': {
-                            'total_images': processed_count,
-                            'total_detections': detection_count,
-                            'avg_detections_per_image': detection_count/max(1, processed_count),
-                            'processing_time': sum(processing_times),
-                            'avg_time_per_image': sum(processing_times)/max(1, len(processing_times))
-                        },
-                        'detailed_results': detection_results
-                    }
-                    
-                    with open(os.path.join(save_path, 'detection_results.json'), 'w') as f:
-                        json.dump(detailed_results, f, indent=4)
                     
                     st.success(f"✅ 检测结果已保存到: {save_path}")
                     
@@ -482,20 +359,10 @@ elif detection_mode == "🎥 实时视频检测":
     st.warning("⚠️ 请确保已授权摄像头访问权限")
     
     # 开始/停止按钮
-    if 'camera_running' not in st.session_state:
-        st.session_state.camera_running = False
-    
-    if st.button('🎥 开始检测' if not st.session_state.camera_running else '⏹️ 停止检测'):
-        st.session_state.camera_running = not st.session_state.camera_running
-    
-    # 创建占位符
-    frame_placeholder = st.empty()
-    stats_placeholder = st.empty()
-    
-    if st.session_state.camera_running:
+    if st.button('🎥 开始检测'):
         cap = cv2.VideoCapture(0)
         
-        while st.session_state.camera_running:
+        while True:
             ret, frame = cap.read()
             if not ret:
                 st.error("无法访问摄像头")
@@ -510,20 +377,15 @@ elif detection_mode == "🎥 实时视频检测":
             for result in results:
                 frame = result.plot()
                 
-                # 更新统计信息
-                boxes = result.boxes
-                current_detections = len(boxes)
-                st.session_state.total_detections += current_detections
-                
                 # 显示实时统计
-                stats_placeholder.markdown(f"""
+                st.markdown(f"""
                 ### 📊 实时监测数据
-                - 当前检测目标数: {current_detections}
+                - 当前检测目标数: {len(result.boxes)}
                 - FPS: {1/(end_time - start_time):.1f}
                 """)
             
             # 显示帧
-            frame_placeholder.image(frame, channels="BGR", caption="实时检测")
+            st.image(frame, channels="BGR", caption="实时检测")
             
             # 控制帧率
             time.sleep(0.01)
@@ -531,7 +393,7 @@ elif detection_mode == "🎥 实时视频检测":
         cap.release()
         
     st.markdown("---")
-    st.info("📝 提示：点击'开始检测'按钮启动摄像头检测，再次点击停止检测。")
+    st.info("📝 提示：点击'开始检测'按钮启动摄像头检测。")
     
 else:  # 视频文件检测
     uploaded_video = st.file_uploader("选择视频文件", type=['mp4', 'avi', 'mov'])
@@ -606,46 +468,8 @@ else:  # 视频文件检测
             # 显示最终统计
             st.success("✅ 视频处理完成！")
             
-            # 创建检测结果图表
-            if detection_results:
-                df = pd.DataFrame(detection_results)
-                fig = px.line(df, x='frame', y='detections',
-                            title='检测目标数量随时间变化',
-                            labels={'frame': '帧数', 'detections': '检测目标数'})
-                st.plotly_chart(fig)
-
-# 统计分析部分
-st.markdown("---")
-st.subheader("📊 检测统计分析")
-
-# 创建三列布局显示主要指标
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric("总处理图片数", st.session_state.processed_images)
-with col2:
-    st.metric("总检测目标数", st.session_state.total_detections)
-with col3:
-    avg_detections = st.session_state.total_detections/max(1, st.session_state.processed_images)
-    st.metric("平均每张检测数", f"{avg_detections:.2f}")
-with col4:
-    if st.session_state.detection_history:
-        max_detections = max(record['num_detections'] for record in st.session_state.detection_history)
-        st.metric("单张最多检测数", max_detections)
-
-# 显示检测历史详情
-if st.session_state.detection_history:
-    with st.expander("📈 查看详细检测历史"):
-        history_df = pd.DataFrame(st.session_state.detection_history)
-        st.dataframe(history_df)
-        
-        # 下载检测历史
-        csv = history_df.to_csv(index=False)
-        st.download_button(
-            label="📥 下载检测历史",
-            data=csv,
-            file_name="detection_history.csv",
-            mime="text/csv"
-        )
+            # 创建检测结果DataFrame
+            df = pd.DataFrame(detection_results)
 
 st.markdown("---")
 st.markdown("第二小组 | 最后更新时间: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
